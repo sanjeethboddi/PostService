@@ -1,0 +1,43 @@
+version: '3.1'
+services:
+    post_service:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: post_service
+        restart: unless-stopped
+        volumes:
+            - "/tmp/images/:/app/images/"
+        env_file: .env
+        ports:
+            - "80:80"
+            - "443:443"
+        depends_on:
+            - post_mongodb
+        links:
+            - "post_mongodb"
+        networks:
+            - backend
+
+    post_mongodb:
+        image: mongo:4.0.3
+        container_name: post_mongodb
+        restart: unless-stopped
+        volumes:
+            - "/tmp/mongo-post-entrypoint/:/docker-entrypoint-initdb.d/"
+        ports:
+            - "27017:27017"
+        expose:
+            - "27017"
+        networks:
+            - backend
+
+
+networks:
+  backend:
+    driver: bridge
+
+    
+    
+
+  
