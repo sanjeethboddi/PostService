@@ -26,7 +26,7 @@ services:
         volumes:
             - "/tmp/mongo-post-entrypoint/:/docker-entrypoint-initdb.d/"
         ports:
-            - "27017:27017"
+            - "27019:27017"
         expose:
             - "27017"
         networks:

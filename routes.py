@@ -7,6 +7,7 @@ from models import Post, UpdatePostModel
 import uuid
 from dotenv import dotenv_values
 import os
+import requests
 
 config = dotenv_values(".env")
 
@@ -16,10 +17,12 @@ DB = "posts"
 IMAGE_FOLDER = config["IMAGE_DIR"]
 
 
-
-
-@router.post("/addPost", response_description="Create a new post", status_code=status.HTTP_201_CREATED)
-def addPost(request:Request, title:str, file: UploadFile = File(...)):
+@router.post("/addPost/{token}", response_description="Create a new post", status_code=status.HTTP_201_CREATED)
+def addPost(token:str, request:Request, response:Response, title:str, file: UploadFile = File(...)):
+    resp =  requests.post(request.app.auth_service+f"/verify/{token}")
+    if  resp.status_code != 200 :
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    userID = resp.json()["username"]
     try:
         contents = file.file.read()
         
@@ -29,13 +32,13 @@ def addPost(request:Request, title:str, file: UploadFile = File(...)):
             file_path = os.path.join(os.path.abspath(IMAGE_FOLDER),random_filename + ".png")
             with open(file_path, 'wb') as f:
                 f.write(contents)
-            # TODO: get used Id from session token or oauth token or jwt token
-            post = Post(userID="sanjeethboddi", title=title, file=random_filename)
+            post = Post(userID= userID, title=title, file=random_filename)
             post = jsonable_encoder(post)
             mongo_response = request.app.database[DB].insert_one(post)
-            return {"postID": str(mongo_response.inserted_id)}
-
+            postID =  str(mongo_response.inserted_id)
+            requests.patch(request.app.feed_service+f"/updateFeedDataForFollowers/{userID}/{token}", json={"postID":postID})
             # response.status_code = status.HTTP_201_CREATED
+            return {"postID": str(mongo_response.inserted_id)}
         else:
             # response.status_code = status.HTTP_400_BAD_REQUEST
             return {"error": "File type not supported"}
@@ -48,18 +51,23 @@ def addPost(request:Request, title:str, file: UploadFile = File(...)):
 
     return {"message": f"Successfully uploaded {file.filename}, status: {title}"}
 
-@router.delete("/deletePost/", response_description="Delete a post")
-def deletePost(postID:str, request: Request, response:Response):
+@router.delete("/deletePost/{token}", response_description="Delete a post")
+def deletePost(token:str, postID:str, request: Request, response:Response):
+    post = request.app.database[DB].find_one({"_id": postID})
+
+    resp =  requests.post(request.app.auth_service+f"/verify/{token}")
+    if  resp.status_code != 200 or resp.json()["username"] != post["userID"]:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
         mongo_response = request.app.database[DB].delete_one({"_id": postID})
-        # return {"postID": str(mongo_response.inserted_id)}
         if mongo_response.deleted_count == 1:
             response.status_code = status.HTTP_204_NO_CONTENT
             return response
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Profile with ID {id} not found")
 
-@router.put("/updatePost")
+@router.put("/updatePost/{token}")
 def updatePost(postID: str, title: str, request: Request):
     request.app.database[DB].update_one({"_id": postID},{"$set" :{"title": title}})
     return {"message": "Successfully updated post"}
