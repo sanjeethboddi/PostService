@@ -87,7 +87,7 @@ def getPost(postID: str, request: Request, response:Response):
         response.status_code = status.HTTP_404_NOT_FOUND
     return post
 
-@router.get("/getPosts", response_model = List[Post])
+@router.post("/getPosts", response_model = List[Post])
 def getPosts(postIDs: List[str], request: Request, response:Response):
     posts = list()
     for id in postIDs:
@@ -95,7 +95,7 @@ def getPosts(postIDs: List[str], request: Request, response:Response):
         posts.append(post)
     return posts
 
-@router.get("/getAllPostIDsByUser")
+@router.post("/getAllPostIDsByUser")
 def getAllPostIDsByUser(userID: str, request: Request, response:Response):
     response =  request.app.database[DB].find({"userID": userID})
     if not response:
